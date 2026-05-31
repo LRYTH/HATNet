@@ -1,0 +1,56 @@
+caption_model: transformer
+
+# ==========================================
+# NWPU 数据集配置
+# ==========================================
+noamopt: true
+noamopt_warmup: 2000          # NWPU数据量大，warmup需要更多步
+label_smoothing: 0.1
+input_json: data/NWPU/NWPU.json
+input_label_h5: data/NWPU/NWPU_label.h5
+input_att_dir: data/NWPU_GeoRSCLIP_cls_att
+
+seq_per_img: 5
+batch_size: 64                # NWPU 31500张，可用更大batch（比RSICD的32翻倍）
+learning_rate: 0.0002          # 数据量大，lr可以适当提高
+
+# ==========================================
+# Transformer 架构
+# ==========================================
+# will be ignored
+num_layers: 6
+input_encoding_size: 512
+rnn_size: 2048
+
+N_enc: 4
+N_dec: 4
+d_model: 512
+d_ff: 2048
+num_att_heads: 8
+dropout: 0.35
+
+att_feat_size: 1280
+
+# ==========================================
+# 学习率调度
+# ==========================================
+learning_rate_decay_start: 0
+learning_rate_decay_every: 4  # NWPU数据量大，epoch内更新步数多，decay间隔略大
+learning_rate_decay_rate: 0.8
+scheduled_sampling_start: -1
+
+# ==========================================
+# 训练策略
+# ==========================================
+save_checkpoint_every: 400    # NWPU每epoch约400步(25200/64)，每epoch保存一次
+save_history_ckpt: 0
+save_every_epoch: True
+
+language_eval: 1
+val_images_use: -1
+max_epochs: 30                # NWPU数据量大，需要更多epoch收敛（相较RSICD的15翻倍）
+train_sample_n: 5
+
+beam_size: 3
+
+REFORWARD: false

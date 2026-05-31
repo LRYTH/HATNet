@@ -1,0 +1,77 @@
+caption_model: transformer
+
+
+#nwpu
+#noamopt: true
+#noamopt_warmup: 2000
+#label_smoothing: 0.1
+#input_json: /home/shenxiang/Zhoumiao/HATNet/data/NWPU/NWPU.json
+#input_label_h5: /home/shenxiang/Zhoumiao/HATNet/data/NWPU/NWPU_label.h5
+#input_att_dir: /home/shenxiang/Zhoumiao/HATNet/data/NWPU_GeoRSCLIP_cls_att
+#
+#seq_per_img: 5
+#batch_size: 50
+#learning_rate: 0.00001
+
+# UCM
+#noamopt: true
+#noamopt_warmup: 2000
+#label_smoothing: 0.1
+#input_json: /home/shenxiang/Zhoumiao/HATNet/data/UCM/UCM.json
+#input_label_h5: /home/shenxiang/Zhoumiao/HATNet/data/UCM/UCM_label.h5
+#input_att_dir: /home/shenxiang/Zhoumiao/HATNet/data/UCM_GeoRSCLIP_cls_att
+##input_att_dir: /home/rzl/lab/nwpu-ImageCaption/data/ucm_GeoRSCLIP_att
+##input_att_dir: /home/rzl/project/ucm-ImageCaption/data/ucmtalk_att
+#
+#seq_per_img: 5
+#batch_size: 16
+#learning_rate: 0.00001
+
+
+# rsicd
+noamopt: true
+noamopt_warmup: 1500
+label_smoothing: 0.1
+input_json: data/RSICD/RSICD.json
+input_label_h5: data/RSICD/RSICD_label.h5
+input_att_dir: data/RSICD_GeoRSCLIP_cls_att
+
+seq_per_img: 5
+batch_size: 32
+learning_rate: 0.00002
+learning_rate_decay_every: 3
+learning_rate_decay_rate: 0.8
+
+
+# will be ignored
+num_layers: 6
+input_encoding_size: 512
+rnn_size: 2048
+
+# Transformer config
+N_enc: 4
+N_dec: 4
+d_model: 512
+d_ff: 2048
+num_att_heads: 8
+dropout: 0.35
+
+att_feat_size: 1280 # GeoRSCLIP
+#att_feat_size: 2048 # ResNet-101
+
+learning_rate_decay_start: 0
+scheduled_sampling_start: -1 
+save_checkpoint_every: 200
+save_history_ckpt: 0 
+
+save_every_epoch: True
+
+language_eval: 1
+val_images_use: -1
+max_epochs: 15
+train_sample_n: 5
+
+beam_size: 3
+
+REFORWARD: false
+
