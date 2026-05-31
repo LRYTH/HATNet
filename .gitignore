@@ -27,8 +27,8 @@ hatnet/
 .DS_Store
 
 # ========== data ==========
-data/
-datasets/
+/data/
+/datasets/
 
 # ========== xlsx ==========
 *.xlsx
