@@ -18,7 +18,7 @@ class LossWrapper(torch.nn.Module):
         self.ppo_crit = losses.PPOLoss(opt, model)
 
     def forward(self, fc_feats, att_feats, labels, masks, att_masks, gts, gt_indices, sc_flag, struc_flag,
-                drop_worst_flag):
+                drop_worst_flag, entity_feats=None):
         opt = self.opt
 
         out = {}
@@ -61,7 +61,7 @@ class LossWrapper(torch.nn.Module):
                 out['kl_loss'] = struc_loss['kl_loss']
                 out['clipfrac'] = struc_loss['clipfrac']
         elif not sc_flag:
-            loss = self.crit(self.model(fc_feats, att_feats, labels[..., :-1], att_masks), labels[..., 1:],
+            loss = self.crit(self.model(fc_feats, att_feats, labels[..., :-1], att_masks, entity_feats=entity_feats), labels[..., 1:],
                              masks[..., 1:], reduction=reduction)
         else:
             self.model.eval()

@@ -163,8 +163,8 @@ def train(opt):
     ##########################
 
     if opt.noamopt:
-        assert opt.caption_model in ['transformer', 'bert', 'm2transformer', 'georsclip',
-                                     'qwen'], 'noamopt can only work with transformer'
+        assert opt.caption_model in ['transformer', 'bert', 'm2transformer', 'georsclip', 'rsclip_ece'
+                                     ], 'noamopt can only work with transformer'
         optimizer = utils.get_std_opt(model, optim_func=opt.optim, factor=opt.noamopt_factor, warmup=opt.noamopt_warmup)
     elif opt.reduce_on_plateau:
         optimizer = utils.build_optimizer(model.parameters(), opt)
@@ -254,13 +254,13 @@ def train(opt):
             torch.cuda.synchronize()
             start = time.time()
 
-            tmp = [data['fc_feats'], data['att_feats'], data['labels'], data['masks'], data['att_masks']]
+            tmp = [data['fc_feats'], data['att_feats'], data['labels'], data['masks'], data['att_masks'], data['entity_feats']]
             tmp = [_ if _ is None else _.cuda() for _ in tmp]
-            fc_feats, att_feats, labels, masks, att_masks = tmp
+            fc_feats, att_feats, labels, masks, att_masks, entity_feats = tmp
 
             optimizer.zero_grad()
             model_out = dp_lw_model(fc_feats, att_feats, labels, masks, att_masks, data['gts'],
-                                    torch.arange(0, len(data['gts'])), sc_flag, struc_flag, drop_worst_flag)
+                                    torch.arange(0, len(data['gts'])), sc_flag, struc_flag, drop_worst_flag, entity_feats=entity_feats)
             if not drop_worst_flag:
                 loss = model_out['loss'].mean()
             else:

@@ -20,6 +20,9 @@ from .AoAModel import AoAModel
 # 导入作者的包
 from .GeoRSCLIP_mul_HAT_PTE import GeoRSCLIPModel
 
+# RSCLIP
+from .RSCLIP_ECEModel import RSCLIP_ECE
+
 def setup(opt):
     if opt.caption_model in ['fc', 'show_tell']:
         print('Warning: %s model is mostly deprecated; many new features are not supported.' %opt.caption_model)
@@ -74,6 +77,9 @@ def setup(opt):
     # GeoRSCLIP
     elif opt.caption_model == 'georsclip':
         model = GeoRSCLIPModel(opt)
+    # RSCLIP_ECE
+    elif opt.caption_model == 'rsclip_ece':
+        model = RSCLIP_ECEModel(opt)
 
     else:
         raise Exception("Caption model not supported: {}".format(opt.caption_model))

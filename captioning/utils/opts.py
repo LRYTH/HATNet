@@ -213,6 +213,10 @@ def parse_opt():
     parser.add_argument('--drop_worst_rate', type=float, default=0,
                         help='')
 
+    # 实体特征
+    parser.add_argument('--input_entity_dir', type=str, default=0,
+                        help='path to the directory containing entity features (xxx_entity.npz)')
+
     # For diversity evaluation during training
     add_diversity_opts(parser)
 

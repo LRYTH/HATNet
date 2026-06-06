@@ -19,6 +19,7 @@ import multiprocessing
 import six
 from transformers import BertTokenizer
 
+
 class HybridLoader:
     """
     If db_path is a director, then use normal file loading
@@ -30,6 +31,7 @@ class HybridLoader:
                Should be useful for lmdb or h5.
                (Copied this idea from vilbert)
     """
+
     def __init__(self, db_path, ext, in_memory=False):
         self.db_path = db_path
         self.ext = ext
@@ -38,14 +40,16 @@ class HybridLoader:
         else:
             def load_npz(x):
                 x = np.load(six.BytesIO(x))
-                return x['feat'] if 'feat' in x else x['z']  # normally it should be 'feat', but under cocotest_bu, the key is saved to be 'z' mistakenly.
+                return x['feat'] if 'feat' in x else x[
+                    'z']  # normally it should be 'feat', but under cocotest_bu, the key is saved to be 'z' mistakenly.
+
             self.loader = load_npz
         if db_path.endswith('.lmdb'):
             self.db_type = 'lmdb'
             self.lmdb = lmdbdict(db_path, unsafe=True)
             self.lmdb._key_dumps = DUMPS_FUNC['ascii']
             self.lmdb._value_loads = LOADS_FUNC['identity']
-        elif db_path.endswith('.pth'): # Assume a key,value dictionary
+        elif db_path.endswith('.pth'):  # Assume a key,value dictionary
             self.db_type = 'pth'
             self.feat_file = torch.load(db_path)
             self.loader = lambda x: x
@@ -59,7 +63,7 @@ class HybridLoader:
         self.in_memory = in_memory
         if self.in_memory:
             self.features = {}
-    
+
     def get(self, key):
 
         if self.in_memory and key in self.features:
@@ -83,8 +87,9 @@ class HybridLoader:
 
         return feat
 
+
 class Dataset(data.Dataset):
-    
+
     def get_vocab_size(self):
         return self.vocab_size
 
@@ -108,20 +113,18 @@ class Dataset(data.Dataset):
         print('DataLoader loading json file: ', opt.input_json)
         self.info = json.load(open(self.opt.input_json))
 
-
         # # ← 加这两行，按 id 数字排序（关键！）
         # self.info['images'] = sorted(self.info['images'],
         #                              key=lambda x: int(x.get('id', 0)))
 
-        
         if 'ix_to_word' in self.info:
             self.ix_to_word = self.info['ix_to_word']
             self.vocab_size = len(self.ix_to_word)
             print('vocab size is ', self.vocab_size)
 
-        
         # open the hdf5 file
-        print('DataLoader loading h5 file: ', opt.input_fc_dir, opt.input_att_dir, opt.input_box_dir, opt.input_label_h5)
+        print('DataLoader loading h5 file: ', opt.input_fc_dir, opt.input_att_dir, opt.input_box_dir,
+              opt.input_label_h5)
         """
         Setting input_label_h5 to none is used when only doing generation.
         For example, when you need to test on coco test set.
@@ -145,14 +148,27 @@ class Dataset(data.Dataset):
         self.att_loader = HybridLoader(self.opt.input_att_dir, '.npz', in_memory=self.data_in_memory)
         self.box_loader = HybridLoader(self.opt.input_box_dir, '.npy', in_memory=self.data_in_memory)
 
-        self.num_images = len(self.info['images']) # self.label_start_ix.shape[0]
-        print('read %d image features' %(self.num_images))
+        # ── ECE: 实体特征加载器 ──────────────────────────────────────
+        # opt.input_entity_dir = "data/UCM_entity"（Step 2 的输出目录）
+        # 若未配置则跳过，模型会以 entity_proj=None 运行（不影响原有逻辑）
+        input_entity_dir = getattr(opt, 'input_entity_dir', 'none')
+        if input_entity_dir != 'none' and os.path.isdir(input_entity_dir):
+            self.entity_loader = HybridLoader(input_entity_dir, '.npz',
+                                              in_memory=self.data_in_memory)
+            print(f'ECE entity loader: {input_entity_dir}')
+        else:
+            self.entity_loader = None
+            print('ECE entity loader: disabled (opt.input_entity_dir not set or not found)')
+        # ────────────────────────────────────────────────────────────
+
+        self.num_images = len(self.info['images'])  # self.label_start_ix.shape[0]
+        print('read %d image features' % (self.num_images))
 
         # separate out indexes for each of the provided splits
         self.split_ix = {'train': [], 'val': [], 'test': []}
-        for ix in range(len(self.info['images'])): 
+        for ix in range(len(self.info['images'])):
             img = self.info['images'][ix]
-            if not 'split' in img: 
+            if not 'split' in img:
                 self.split_ix['train'].append(ix)
                 self.split_ix['val'].append(ix)
                 self.split_ix['test'].append(ix)
@@ -162,25 +178,25 @@ class Dataset(data.Dataset):
                 self.split_ix['val'].append(ix)
             elif img['split'] == 'test':
                 self.split_ix['test'].append(ix)
-            elif opt.train_only == 0: # restval
+            elif opt.train_only == 0:  # restval
                 self.split_ix['train'].append(ix)
 
-        print('assigned %d images to split train' %len(self.split_ix['train']))
-        print('assigned %d images to split val' %len(self.split_ix['val']))
-        print('assigned %d images to split test' %len(self.split_ix['test']))
+        print('assigned %d images to split train' % len(self.split_ix['train']))
+        print('assigned %d images to split val' % len(self.split_ix['val']))
+        print('assigned %d images to split test' % len(self.split_ix['test']))
 
-    def get_captions(self, ix, seq_per_img): 
+    def get_captions(self, ix, seq_per_img):
         # fetch the sequence labels
-        ix1 = self.label_start_ix[ix] - 1 #label_start_ix starts from 1
+        ix1 = self.label_start_ix[ix] - 1  # label_start_ix starts from 1
         ix2 = self.label_end_ix[ix] - 1
-        ncap = ix2 - ix1 + 1 # number of captions available for this image
+        ncap = ix2 - ix1 + 1  # number of captions available for this image
         assert ncap > 0, 'an image does not have any label. this can be handled but right now isn\'t'
 
         if ncap < seq_per_img:
             # we need to subsample (with replacement)
-            seq = np.zeros([seq_per_img, self.seq_length], dtype = 'int')
+            seq = np.zeros([seq_per_img, self.seq_length], dtype='int')
             for q in range(seq_per_img):
-                ixl = random.randint(ix1,ix2)
+                ixl = random.randint(ix1, ix2)
                 seq[q, :] = self.label[ixl, :self.seq_length]
         else:
             ixl = random.randint(ix1, ix2 - seq_per_img + 1)
@@ -188,10 +204,11 @@ class Dataset(data.Dataset):
 
         return seq
 
-    def collate_func(self, batch, split): 
+    def collate_func(self, batch, split):
         seq_per_img = self.seq_per_img
         fc_batch = []
         att_batch = []
+        entity_batch = []  # ── ECE ──
         label_batch = []
         wrapped = False
         infos = []
@@ -199,16 +216,17 @@ class Dataset(data.Dataset):
         batch_lens = []
         for sample in batch:
             # fetch image
-            tmp_fc, tmp_att, tmp_seq, ix, it_pos_now, tmp_wrapped = sample
+            tmp_fc, tmp_att, tmp_entity, tmp_seq, ix, it_pos_now, tmp_wrapped = sample
             if tmp_wrapped:
                 wrapped = True
 
             fc_batch.append(tmp_fc)
             att_batch.append(tmp_att)
-            tmp_label = np.zeros([seq_per_img, self.seq_length + 2], dtype = 'int')
+            entity_batch.append(tmp_entity)  # ── ECE ──
+            tmp_label = np.zeros([seq_per_img, self.seq_length + 2], dtype='int')
             if hasattr(self, 'h5_label_file'):
                 # if there is ground truth
-                tmp_label[:, 1 : self.seq_length + 1] = tmp_seq # 在这里给label前放了一个0
+                tmp_label[:, 1: self.seq_length + 1] = tmp_seq  # 在这里给label前放了一个0
             label_batch.append(tmp_label)
 
             # Used for reward evaluation
@@ -218,7 +236,7 @@ class Dataset(data.Dataset):
                 batch_lens.extend(self.label_length[self.label_start_ix[ix] - 1: self.label_end_ix[ix]])
             else:
                 gts.append([])
-        
+
             # record associated info as well
             info_dict = {}
             info_dict['ix'] = ix
@@ -228,11 +246,16 @@ class Dataset(data.Dataset):
 
         # #sort by att_feat length
         # fc_batch, att_batch, label_batch, gts, infos = zip(*sorted(zip(fc_batch, att_batch, np.vsplit(label_batch, batch_size), gts, infos), key=lambda x: len(x[1]), reverse=True))
-        fc_batch, att_batch, label_batch, gts, infos = zip(*sorted(zip(fc_batch, att_batch, label_batch, gts, infos), key=lambda x: 0, reverse=True)) 
+        fc_batch, att_batch, entity_batch, label_batch, gts, infos = zip(
+            *sorted(
+                zip(fc_batch, att_batch, entity_batch, label_batch, gts, infos),
+                key=lambda x: 0, reverse=True
+            )
+        )
         data = {}
         data['fc_feats'] = np.stack(fc_batch)
-
         data['att_feats'] = np.stack(att_batch)
+        data['entity_feats'] = np.stack(entity_batch)  # (B, M, 1024)  ── ECE ──
 
         # merge att_feats
         # max_att_len = max([_.shape[0] for _ in att_batch])
@@ -254,48 +277,50 @@ class Dataset(data.Dataset):
         data['labels'] = np.vstack(label_batch)
 
         # generate mask
-        nonzeros = np.array(list(map(lambda x: (x != 0).sum()+2, data['labels'])))
-        mask_batch = np.zeros([data['labels'].shape[0], self.seq_length + 2], dtype = 'float32')
+        nonzeros = np.array(list(map(lambda x: (x != 0).sum() + 2, data['labels'])))
+        mask_batch = np.zeros([data['labels'].shape[0], self.seq_length + 2], dtype='float32')
         for ix, row in enumerate(mask_batch):
             row[:nonzeros[ix]] = 1
 
         data['masks'] = mask_batch
         data['labels'] = data['labels'].reshape(len(batch), seq_per_img, -1)
         data['masks'] = data['masks'].reshape(len(batch), seq_per_img, -1)
-        data['gts'] = gts # all ground truth captions of each images
-        data['bounds'] = {'it_pos_now': it_pos_now, 'it_max': len(self.split_ix[split]), 'wrapped': wrapped}  # the it_pos_now of the last sample
+        data['gts'] = gts  # all ground truth captions of each images
+        data['bounds'] = {'it_pos_now': it_pos_now, 'it_max': len(self.split_ix[split]),
+                          'wrapped': wrapped}  # the it_pos_now of the last sample
         data['infos'] = infos
 
-        data = {k:torch.from_numpy(v) if type(v) is np.ndarray else v for k,v in data.items()} # Turn all ndarray to torch tensor
+        data = {k: torch.from_numpy(v) if type(v) is np.ndarray else v for k, v in
+                data.items()}  # Turn all ndarray to torch tensor
 
         return data
 
-    def __getitem__(self, index): 
+    def __getitem__(self, index):
         """This function returns a tuple that is further passed to collate_fn
         """
-        ix, it_pos_now, wrapped = index #self.split_ix[index]
-
+        ix, it_pos_now, wrapped = index  # self.split_ix[index]
 
         if self.use_att:
             att_feat = self.att_loader.get(str(self.info['images'][ix]['id']))
             # Reshape to K x C
-            #att_feat = att_feat.reshape(-1, att_feat.shape[-1]) 
+            # att_feat = att_feat.reshape(-1, att_feat.shape[-1])
             if self.norm_att_feat:
-                att_feat = att_feat / np.linalg.norm(att_feat, 2, 1, keepdims=True) 
+                att_feat = att_feat / np.linalg.norm(att_feat, 2, 1, keepdims=True)
 
             if self.use_box:
                 box_feat = self.box_loader.get(str(self.info['images'][ix]['id']))
                 # devided by image width and height
-                x1,y1,x2,y2 = np.hsplit(box_feat, 4)
-                h,w = self.info['images'][ix]['height'], self.info['images'][ix]['width']
-                box_feat = np.hstack((x1/w, y1/h, x2/w, y2/h, (x2-x1)*(y2-y1)/(w*h))) # question? x2-x1+1??
+                x1, y1, x2, y2 = np.hsplit(box_feat, 4)
+                h, w = self.info['images'][ix]['height'], self.info['images'][ix]['width']
+                box_feat = np.hstack(
+                    (x1 / w, y1 / h, x2 / w, y2 / h, (x2 - x1) * (y2 - y1) / (w * h)))  # question? x2-x1+1??
                 if self.norm_box_feat:
                     box_feat = box_feat / np.linalg.norm(box_feat, 2, 1, keepdims=True)
                 att_feat = np.hstack([att_feat, box_feat])
                 # sort the features by the size of boxes
-                att_feat = np.stack(sorted(att_feat, key=lambda x:x[-1], reverse=True))
+                att_feat = np.stack(sorted(att_feat, key=lambda x: x[-1], reverse=True))
         else:
-            att_feat = np.zeros((0,0), dtype='float32')
+            att_feat = np.zeros((0, 0), dtype='float32')
         if self.use_fc:
             try:
                 fc_feat = self.fc_loader.get(str(self.info['images'][ix]['id']))
@@ -308,10 +333,24 @@ class Dataset(data.Dataset):
             seq = self.get_captions(ix, self.seq_per_img)
         else:
             seq = None
-        return (fc_feat,att_feat, seq, ix, it_pos_now, wrapped)
+
+        # ── ECE: 加载实体特征 ────────────────────────────────────────
+        img_id = str(self.info['images'][ix]['id'])
+        if self.entity_loader is not None:
+            try:
+                entity_feat = self.entity_loader.get(img_id + '_entity')  # (M, 1024)
+            except Exception:
+                # 文件缺失时用零向量兜底，不影响训练流程
+                entity_feat = np.zeros((5, 1024), dtype='float32')
+        else:
+            entity_feat = np.zeros((5, 1024), dtype='float32')
+        # ────────────────────────────────────────────────────────────
+
+        return (fc_feat, att_feat, entity_feat, seq, ix, it_pos_now, wrapped)
 
     def __len__(self):
         return len(self.info['images'])
+
 
 class DataLoader:
 
@@ -324,26 +363,26 @@ class DataLoader:
         self.loaders, self.iters = {}, {}
         for split in ['train', 'val', 'test']:
             if split == 'train':
-                sampler = MySampler(self.dataset.split_ix[split], shuffle=True, wrap=True) 
+                sampler = MySampler(self.dataset.split_ix[split], shuffle=True, wrap=True)
             else:
-                sampler = MySampler(self.dataset.split_ix[split], shuffle=False, wrap=False) 
+                sampler = MySampler(self.dataset.split_ix[split], shuffle=False, wrap=False)
 
             self.loaders[split] = data.DataLoader(dataset=self.dataset,
                                                   batch_size=self.batch_size,
                                                   sampler=sampler,
                                                   pin_memory=True,
-                                                  num_workers=0, # 4 is usually enough
-                                                  collate_fn=partial(self.dataset.collate_func, split=split), 
+                                                  num_workers=0,  # 4 is usually enough
+                                                  collate_fn=partial(self.dataset.collate_func, split=split),
                                                   drop_last=False,
                                                   persistent_workers=False)
 
-            self.iters[split] = iter(self.loaders[split]) 
+            self.iters[split] = iter(self.loaders[split])
 
     def get_batch(self, split):
         try:
             data = next(self.iters[split])
-        except StopIteration: 
-            self.iters[split] = iter(self.loaders[split]) 
+        except StopIteration:
+            self.iters[split] = iter(self.loaders[split])
             data = next(self.iters[split])
         return data
 
@@ -374,8 +413,9 @@ class DataLoader:
                 return (self.iters[split]._send_idx - self.iters[split]._rcvd_idx) * self.batch_size
             else:
                 return 0
+
         return {split: loader.sampler.state_dict(get_prefetch_num(split)) \
-                    for split, loader in self.loaders.items()}
+                for split, loader in self.loaders.items()}
 
     def load_state_dict(self, state_dict=None):
         if state_dict is None:
@@ -383,11 +423,12 @@ class DataLoader:
         for split in self.loaders.keys():
             self.loaders[split].sampler.load_state_dict(state_dict[split])
 
-class MySampler(data.sampler.Sampler): 
+
+class MySampler(data.sampler.Sampler):
     def __init__(self, index_list, shuffle, wrap):
         self.index_list = index_list
         self.shuffle = shuffle
-        self.wrap = wrap 
+        self.wrap = wrap
         # if wrap, there will be not stop iteration called
         # wrap True used during training, and wrap False used during test.
         self._reset_iter()
@@ -403,9 +444,9 @@ class MySampler(data.sampler.Sampler):
                 wrapped = True
             else:
                 raise StopIteration()
-        if len(self._index_list) == 0: # overflow when 0 samples
+        if len(self._index_list) == 0:  # overflow when 0 samples
             return None
-        elem = (self._index_list[self.iter_counter], self.iter_counter+1, wrapped)
+        elem = (self._index_list[self.iter_counter], self.iter_counter + 1, wrapped)
         self.iter_counter += 1
         return elem
 
@@ -436,5 +477,3 @@ class MySampler(data.sampler.Sampler):
             'index_list': self._index_list,
             'iter_counter': self.iter_counter - prefetched_num
         }
-
-    

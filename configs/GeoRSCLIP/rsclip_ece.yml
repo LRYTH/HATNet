@@ -1,0 +1,85 @@
+caption_model: rsclip_ece
+
+
+#nwpu
+#noamopt: true
+#noamopt_warmup: 1200
+#label_smoothing: 0.1
+#input_json: /home/shenxiang/Zhoumiao/HATNet/data/NWPU/NWPU.json
+#input_label_h5: /home/shenxiang/Zhoumiao/HATNet/data/NWPU/NWPU_label.h5
+#input_att_dir: /home/shenxiang/Zhoumiao/HATNet/data/NWPU_GeoRSCLIP_cls_att
+#
+#seq_per_img: 5
+#batch_size: 100
+#learning_rate: 0.00001
+
+# UCM
+noamopt: true
+noamopt_warmup: 1550
+label_smoothing: 0.1
+input_json: /home/shenxiang/Zhoumiao/HATNet/data/UCM/UCM.json
+input_label_h5: /home/shenxiang/Zhoumiao/HATNet/data/UCM/UCM_label.h5
+input_att_dir: /home/shenxiang/Zhoumiao/HATNet/data/UCM_GeoRSCLIP_cls_att
+input_entity_dir: /home/shenxiang/Zhoumiao/HATNet/data/UCM_entity
+#input_att_dir: /home/rzl/lab/nwpu-ImageCaption/data/ucm_GeoRSCLIP_att
+#input_att_dir: /home/rzl/project/ucm-ImageCaption/data/ucmtalk_att
+
+seq_per_img: 5
+batch_size: 16
+learning_rate: 0.0001
+
+
+
+# rsicd
+#noamopt: true
+#noamopt_warmup: 1750
+#label_smoothing: 0.1
+#input_json: /home/shenxiang/Zhoumiao/HATNet/data/RSICD/RSICD.json
+#input_label_h5: /home/shenxiang/Zhoumiao/HATNet/data/RSICD/RSICD_label.h5
+#input_att_dir: /home/shenxiang/Zhoumiao/HATNet/data/RSICD_GeoRSCLIP_cls_att
+#
+#seq_per_img: 5
+#batch_size: 32
+#learning_rate: 0.0001
+
+# 这三样在开启noampt之后会失效
+#learning_rate_decay_start: 0
+#learning_rate_decay_every: 1        # 每 2 个 epoch 衰减
+#learning_rate_decay_rate: 0.7
+
+
+
+# will be ignored
+num_layers: 6
+input_encoding_size: 512
+rnn_size: 2048
+
+# Transformer config
+N_enc: 4
+N_dec: 4
+d_model: 512
+d_ff: 2048
+num_att_heads: 8
+dropout: 0.1
+
+att_feat_size: 1280 # GeoRSCLIP
+#att_feat_size: 2048 # ResNet-101
+
+
+scheduled_sampling_start: -1
+save_checkpoint_every: 200
+save_history_ckpt: 0
+
+save_every_epoch: True
+
+language_eval: 1
+val_images_use: -1
+max_epochs: 40
+train_sample_n: 5
+
+beam_size: 3
+
+REFORWARD: false
+
+#sample_method: sample
+#temperature: 0.7
